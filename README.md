@@ -29,7 +29,7 @@ Most "custom encryption" found in malware samples and beginner-to-intermediate c
 ## Installation
 
 ```bash
-git clone https://github.com/X_9/xor_killer.git
+git clone https://github.com/simo-creator/xor_killer.git
 cd xor_killer
 ```
 
