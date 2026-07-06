@@ -24,6 +24,7 @@ parser.add_argument("--hex", nargs="+", help="Hex values")
 parser.add_argument("--multihex", nargs="+", help="Ghidra style (0xVALUE/LEN)")
 parser.add_argument("--key", nargs="+", help="XOR Key in hex")
 parser.add_argument("--keystep", help="Amount to increment the key by after each byte (hex)")
+parser.add_argument("--keymul", help="Multiply key by this value after each byte (hex)")
 
 # Operations
 parser.add_argument("--ror", type=int, help="Rotate Right value")
@@ -72,6 +73,7 @@ else:
 print(f"[*] Encrypted Buffer: {enc.hex()}")
 
 # 2-Key Setup
+
 if args.key:
     try:
         key_bytes = bytes([int(x, 16) for x in args.key])
@@ -113,10 +115,14 @@ for i in range(len(enc)):
 
     for op in ops_order:
         if op == 'xor':
+
             if 'key_bytes' in locals() and len(key_bytes) > 0:
                 if args.keystep:
                     step = int(args.keystep, 16)
                     k = (key_bytes[0] + step * i) % 256
+                elif args.keymul:
+                    mul = int(args.keymul, 16)
+                    k = (key_bytes[0] * pow(mul, i, 256)) % 256
                 else:
                     k = key_bytes[i % len(key_bytes)]
                 res = res ^ k
