@@ -1,6 +1,7 @@
 # XORKILLER
 
 **by X_9**
+<img width="1300" height="555" alt="image" src="https://github.com/user-attachments/assets/89c1eff9-fb27-48a0-9f6d-1d105a76063b" />
 
 A command-line tool for reversing simple byte-level obfuscation chains — XOR, ROL, ROR, ADD, and SUB — in whatever order they were originally applied. Built for malware reverse engineering (recovering obfuscated strings/config data) and CTF crackme challenges.
 
