@@ -1,11 +1,11 @@
 # XORKILLER
 
 **by X_9**
-<img width="1250" height="588" alt="image" src="https://github.com/user-attachments/assets/1229290f-4bb9-4a35-a0e6-a77015502c33" />
+<img width="1323" height="607" alt="image" src="https://github.com/user-attachments/assets/0f9a1f56-adcc-437b-87b2-c2637f767758" />
 
 A command-line tool for reversing simple byte-level obfuscation chains — XOR, ROL, ROR, ADD, and SUB — in whatever order they were originally applied. Built for malware reverse engineering (recovering obfuscated strings/config data) and CTF crackme challenges.
 
-Most "custom encryption" found in malware samples and beginner-to-intermediate crackmes isn't real crypto — it's a small stack of these five operations applied byte-by-byte. XORKILLER lets you replay that stack in the exact order it was applied, with a single-key, multi-byte, rolling, or known-plaintext XOR, and Ghidra-friendly input, without writing a one-off Python script every time.
+Most "custom encryption" found in malware samples and beginner-to-intermediate crackmes isn't real crypto — it's a small stack of these five operations applied byte-by-byte. XORKILLER lets you replay that stack in the exact order it was applied, with a single-key, multi-byte, additive-rolling, multiplicative-rolling, or known-plaintext XOR, and Ghidra-friendly input, without writing a one-off Python script every time.
 
 ---
 
@@ -14,7 +14,8 @@ Most "custom encryption" found in malware samples and beginner-to-intermediate c
 - **Chained operations** — combine `xor`, `rol`, `ror`, `add`, `sub` in any order.
 - **Order-aware** — the order you type the flags on the command line is the order the operations run in. `--sub index --key A7` decrypts differently than `--key A7 --sub index`, and the tool respects that.
 - **Dynamic index-based add/sub** — use `index` instead of a fixed number when the obfuscation adds/subtracts the byte's position (`data[i] - i`, a very common pattern).
-- **Rolling XOR key** — use `--keystep` when the key itself increments by a fixed amount after every byte (`key, key+step, key+2*step, ...`), a pattern common in malware config decryption.
+- **Additive rolling XOR key** — use `--keystep` when the key increments by a fixed amount after every byte (`key, key+step, key+2*step, ...`), a pattern common in malware config decryption.
+- **Multiplicative rolling XOR key** — use `--keymul` when the key is multiplied by a fixed factor after every byte (`key, key*mul, key*mul^2, ...`) instead of incremented.
 - **Ghidra-style input** — paste `0xVALUE/LEN` tokens straight from a Ghidra decompiler view via `--multihex`.
 - **Known-plaintext key recovery** — don't have the XOR key? Give a known/guessed plaintext prefix and XORKILLER derives the key from it.
 - **Interactive fallback** — if you don't pass a key or exact length via flags, it will prompt you for it.
@@ -42,10 +43,10 @@ No install step needed — it's a single script.
 ## Basic Usage
 
 ```bash
-python3 xorkiller.py [--hex ... | --multihex ...] [--key ...] [--keystep N] [--ror N] [--rol N] [--sub N|index] [--add N|index]
+python3 xorkiller.py [--hex ... | --multihex ...] [--key ...] [--keystep N | --keymul N] [--ror N] [--rol N] [--sub N|index] [--add N|index]
 ```
 
-You must supply the encrypted bytes via **either** `--hex` or `--multihex`. Everything else is optional and depends on the obfuscation scheme you're reversing.
+You must supply the encrypted bytes via **either** `--hex` or `--multihex`. Everything else is optional and depends on the obfuscation scheme you're reversing. `--keystep` and `--keymul` are mutually exclusive — use whichever matches the rolling behavior you found in the disassembly.
 
 ---
 
@@ -151,15 +152,33 @@ Enter it: 6
 
 This trims the result down to the first 6 real bytes before decryption.
 
-### Scenario 8: Rolling XOR key (key increments per byte)
+### Scenario 8: Additive rolling XOR key (key increments per byte)
 
-Some obfuscation routines don't reuse a static key — instead, the key itself advances by a fixed step after every byte, e.g. `key = 0x11`, then `0x16`, `0x1B`, `0x20`, and so on. You'll typically spot this in a Ghidra decompilation as a variable that gets incremented at the end of a loop body, right after the XOR.
+Some obfuscation routines don't reuse a static key — instead, the key itself advances by a fixed step after every byte, e.g. `key = 0x11`, then `0x16`, `0x1B`, `0x20`, and so on. You'll typically spot this in a Ghidra decompilation as a variable that gets incremented at the end of a loop body, right after the XOR:
+
+```c
+key = key + 5;   // after XOR, before next iteration
+```
 
 ```bash
 python3 xorkiller.py --hex 4d 8e 7e ff 6f 1f --sub 9 --ror 4 --key 11 --keystep 5
 ```
 
 `--keystep` takes a hex value and is only meaningful alongside `--key`. The starting key is the first byte of `--key`, and each subsequent byte in the buffer is XORed against `(key + keystep * i) % 256`. This overrides normal multi-byte key cycling — if `--keystep` is set, `--key` is treated as a single starting value rather than a repeating sequence.
+
+### Scenario 9: Multiplicative rolling XOR key (key is scaled per byte)
+
+A less common but still-seen variant: instead of incrementing, the key is multiplied by a constant factor after every byte, e.g. `key = 0x03`, then `0x09`, `0x1B`, `0x51`, and so on (mod 256). In Ghidra this shows up as multiplication instead of addition at the end of the loop:
+
+```c
+key = key * 3;   // instead of key = key + 3
+```
+
+```bash
+python3 xorkiller.py --hex 6a 5d 12 ff --key 03 --keymul 3
+```
+
+`--keymul` takes a hex value and is only meaningful alongside `--key`. The starting key is the first byte of `--key`, and byte `i` is XORed against `(key * mul^i) % 256`. Like `--keystep`, this overrides normal multi-byte key cycling. Don't combine `--keystep` and `--keymul` in the same run — pick whichever matches the increment operator you see in the disassembly (`+` vs `*`).
 
 ---
 
