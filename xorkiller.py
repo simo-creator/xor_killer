@@ -23,7 +23,7 @@ parser = argparse.ArgumentParser(description="XORKILLER tool by X_9 - DECRYPT TH
 parser.add_argument("--hex", nargs="+", help="Hex values")
 parser.add_argument("--multihex", nargs="+", help="Ghidra style (0xVALUE/LEN)")
 parser.add_argument("--key", nargs="+", help="XOR Key in hex")
-
+parser.add_argument("--keystep", help="Amount to increment the key by after each byte (hex)")
 
 # Operations
 parser.add_argument("--ror", type=int, help="Rotate Right value")
@@ -110,12 +110,15 @@ if not ops_order:
 dec_list = []
 for i in range(len(enc)):
     res = enc[i]
-    
+
     for op in ops_order:
         if op == 'xor':
-
             if 'key_bytes' in locals() and len(key_bytes) > 0:
-                k = key_bytes[i % len(key_bytes)]
+                if args.keystep:
+                    step = int(args.keystep, 16)
+                    k = (key_bytes[0] + step * i) % 256
+                else:
+                    k = key_bytes[i % len(key_bytes)]
                 res = res ^ k
         elif op == 'ror':
             res = ror(res, args.ror)
@@ -127,7 +130,7 @@ for i in range(len(enc)):
         elif op == 'add':
             val = i if args.add == "index" else int(args.add)
             res = (res + val) % 256
-            
+
     dec_list.append(res)
 
 dec = bytes(dec_list)
